@@ -29,6 +29,11 @@ enum class Carrier(
     val defaultWebUrlPrefix: String,
     val preferWeb: Boolean = true
 ) {
+    HERMES(
+        label = "Hermes",
+        packageName = "de.hermes.myhermes",
+        defaultWebUrlPrefix = "https://www.myhermes.at/empfangen/sendungsverfolgung/?waybill="
+    ),
     GLS(
         label = "GLS",
         packageName = "com.gls.glsgroup.gls",
@@ -38,11 +43,6 @@ enum class Carrier(
         label = "DPD",
         packageName = "de.dpd.dpd",
         defaultWebUrlPrefix = "https://tracking.dpd.de/status/de_AT/parcel/"
-    ),
-    HERMES(
-        label = "Hermes",
-        packageName = "de.hermes.myhermes",
-        defaultWebUrlPrefix = "https://www.myhermes.at/empfangen/sendungsverfolgung/?waybill="
     ),
     UPS(
         label = "UPS",
@@ -67,15 +67,11 @@ fun normalizeScanInput(rawInput: String): String {
 
     if (cleaned.isEmpty()) return ""
 
-    // Falls ein URL- oder Label-String mit "=" oder "/" am Ende/Mitte steckt, relevanten Teil extrahieren
     val upsMatch = Regex("""1Z[0-9A-Z]{6,20}""").find(cleaned)
     if (upsMatch != null) return upsMatch.value
 
-    val dpd0034Match = Regex("""0034\d{10,20}""").find(cleaned)
-    if (dpd0034Match != null) return dpd0034Match.value
-
-    val hermesMatch = Regex("""H[0-9A-Z]{9,22}""").find(cleaned)
-    if (hermesMatch != null) return hermesMatch.value
+    val hermesAlphaMatch = Regex("""H[0-9A-Z]{9,22}""").find(cleaned)
+    if (hermesAlphaMatch != null) return hermesAlphaMatch.value
 
     return cleaned.replace(" ", "")
 }
@@ -96,49 +92,43 @@ fun analyzeScanCode(rawInput: String): ScanDetectionResult {
             normalizedCode = code,
             detectedCarrier = Carrier.UPS,
             isConfidentMatch = code.length >= 16,
-            reason = "UPS-Format (1Z...) erkannt"
-        )
-
-        code.startsWith("0034") && code.length >= 14 -> ScanDetectionResult(
-            normalizedCode = code,
-            detectedCarrier = Carrier.DPD,
-            isConfidentMatch = code.length >= 14,
-            reason = "DPD-Format (0034...) erkannt"
-        )
-
-        (code.startsWith("01") || code.startsWith("05")) && code.length in 10..20 && code.all { it.isDigit() } -> ScanDetectionResult(
-            normalizedCode = code,
-            detectedCarrier = Carrier.DPD,
-            isConfidentMatch = code.length >= 14,
-            reason = "DPD-Nummer erkannt"
+            reason = "UPS erkannt (1Z...)"
         )
 
         code.startsWith("H") && code.length >= 10 -> ScanDetectionResult(
             normalizedCode = code,
             detectedCarrier = Carrier.HERMES,
             isConfidentMatch = code.length >= 12,
-            reason = "Hermes-Format (H...) erkannt"
+            reason = "Hermes erkannt (H...)"
         )
 
-        code.length in 11..14 && code.all { it.isDigit() } -> ScanDetectionResult(
+        // Typische längere Hermes-Paketscheine / Sendungsnummern (z. B. 14- bis 20-stellig)
+        code.length in 14..20 && code.all { it.isDigit() } && !code.startsWith("0034") -> ScanDetectionResult(
             normalizedCode = code,
-            detectedCarrier = Carrier.GLS,
-            isConfidentMatch = code.length in 11..14,
-            reason = "GLS-Nummernformat (${code.length} Stellen) erkannt"
+            detectedCarrier = Carrier.HERMES,
+            isConfidentMatch = true,
+            reason = "Hermes erkannt (${code.length}-stellige Nummer)"
         )
 
-        code.length in 8..24 && code.all { it.isDigit() } -> ScanDetectionResult(
+        code.startsWith("0034") && code.length >= 14 -> ScanDetectionResult(
+            normalizedCode = code,
+            detectedCarrier = Carrier.DPD,
+            isConfidentMatch = code.length >= 14,
+            reason = "DPD erkannt (0034...)"
+        )
+
+        code.length in 11..13 && code.all { it.isDigit() } -> ScanDetectionResult(
             normalizedCode = code,
             detectedCarrier = Carrier.GLS,
-            isConfidentMatch = false,
-            reason = "Zahlencode (${code.length} Stellen) – GLS vermutet, bitte prüfen"
+            isConfidentMatch = true,
+            reason = "GLS erkannt (${code.length}-stellige Nummer)"
         )
 
         else -> ScanDetectionResult(
             normalizedCode = code,
             detectedCarrier = null,
             isConfidentMatch = false,
-            reason = "Muster nicht eindeutig (${code.length} Zeichen) – Anbieter manuell wählen"
+            reason = "Anbieter bitte manuell wählen (${code.length} Zeichen)"
         )
     }
 }
@@ -211,8 +201,8 @@ fun GatewayScreen() {
         mutableStateOf(prefs.getBoolean(KEY_AUTO_REDIRECT, false))
     }
     var selectedCarrier by remember {
-        val savedName = prefs.getString(KEY_SELECTED_CARRIER, Carrier.GLS.name) ?: Carrier.GLS.name
-        mutableStateOf(Carrier.entries.find { it.name == savedName } ?: Carrier.GLS)
+        val savedName = prefs.getString(KEY_SELECTED_CARRIER, Carrier.HERMES.name) ?: Carrier.HERMES.name
+        mutableStateOf(Carrier.entries.find { it.name == savedName } ?: Carrier.HERMES)
     }
     var showUrlConfig by remember { mutableStateOf(false) }
     var trackingCode by remember { mutableStateOf("") }
@@ -277,7 +267,7 @@ fun GatewayScreen() {
 
         if (trackingCode.isNotBlank()) {
             Text(
-                text = "Erkennung: ${analysis.reason} | Code: ${analysis.normalizedCode}",
+                text = "Erkannt: ${analysis.detectedCarrier?.label ?: "Keiner"} | ${analysis.reason} | Code: ${analysis.normalizedCode}",
                 style = MaterialTheme.typography.bodySmall
             )
         }
@@ -346,7 +336,7 @@ fun GatewayScreen() {
         TextButton(
             onClick = { showUrlConfig = !showUrlConfig }
         ) {
-            Text(if (showUrlConfig) "Ziel-URLs ausblenden" else "Ziel-URLs (GLS, DPD, Hermes, UPS) bearbeiten")
+            Text(if (showUrlConfig) "Ziel-URLs ausblenden" else "Ziel-URLs (Hermes, GLS, DPD, UPS) bearbeiten")
         }
 
         if (showUrlConfig) {
