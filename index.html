@@ -1,0 +1,392 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#123d2c">
+<title>TRAKUNA – Paketshop</title>
+<style>
+:root {
+  --green:#123d2c;
+  --green2:#1d6045;
+  --light:#edf4ef;
+  --white:#fff;
+  --text:#17251d;
+  --muted:#718078;
+  --border:#dce6df;
+}
+* {box-sizing:border-box}
+body {
+  margin:0;
+  background:#f3f6f3;
+  color:var(--text);
+  font-family:Arial,sans-serif;
+}
+header {
+  background:var(--green);
+  color:white;
+  padding:22px 18px;
+}
+.brand {font-size:25px;font-weight:800;letter-spacing:2px}
+.tagline {font-size:12px;opacity:.8;margin-top:5px}
+main {max-width:650px;margin:auto;padding:16px}
+h2 {font-size:19px;margin:22px 0 12px}
+.card {
+  background:white;
+  border-radius:17px;
+  padding:17px;
+  margin-bottom:14px;
+  box-shadow:0 3px 14px #183c2710;
+}
+.scan {
+  background:var(--green);
+  color:white;
+  text-align:center;
+  padding:24px 16px;
+}
+.scan h2 {font-size:21px;margin:0 0 8px}
+.scan p {font-size:13px;opacity:.8}
+input,select {
+  width:100%;
+  padding:15px;
+  border:1px solid var(--border);
+  border-radius:11px;
+  font-size:16px;
+  background:white;
+  margin:7px 0;
+}
+button {
+  border:0;
+  border-radius:12px;
+  padding:14px;
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+}
+.primary {
+  background:var(--green2);
+  color:white;
+  width:100%;
+  margin-top:8px;
+}
+.scanbtn {
+  background:white;
+  color:var(--green);
+  width:100%;
+  margin-top:8px;
+}
+.grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:11px;
+}
+.action {
+  background:white;
+  color:var(--green);
+  border:1px solid var(--border);
+  min-height:100px;
+  text-align:left;
+  padding:16px;
+}
+.action span {display:block;font-size:26px;margin-bottom:9px}
+.action strong {font-size:15px}
+.small {font-size:12px;color:var(--muted)}
+.item {
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:13px;
+  margin:9px 0;
+  background:white;
+}
+.item strong {display:block;margin-bottom:5px}
+.status {
+  display:inline-block;
+  background:var(--light);
+  color:var(--green);
+  border-radius:20px;
+  padding:5px 9px;
+  font-size:11px;
+  margin-top:7px;
+}
+.tabs {
+  display:flex;
+  gap:7px;
+  overflow-x:auto;
+  margin:15px 0;
+}
+.tabs button {
+  white-space:nowrap;
+  background:white;
+  border:1px solid var(--border);
+  color:var(--green);
+}
+.tabs button.active {
+  background:var(--green);
+  color:white;
+}
+.hidden {display:none}
+.notice {
+  background:#fff6df;
+  padding:12px;
+  border-radius:10px;
+  font-size:12px;
+  line-height:1.5;
+}
+footer {
+  text-align:center;
+  padding:25px;
+  color:var(--muted);
+  font-size:11px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">TRAKUNA</div>
+  <div class="tagline">ALLE PAKETDIENSTE. EIN SMARTPHONE.</div>
+</header>
+
+<main>
+  <section class="card scan">
+    <h2>PAKET SCANNEN</h2>
+    <p>Sendungsnummer eingeben oder Barcode mit der Kamera erfassen.</p>
+    <input id="tracking" placeholder="Sendungsnummer / Barcode" autocomplete="off">
+    <button class="scanbtn" onclick="startScan()">▣ KAMERA SCANNEN</button>
+    <button class="primary" onclick="continueWithNumber()">WEITER</button>
+    <div id="cameraInfo" class="small" style="color:white;margin-top:10px"></div>
+    <video id="video" class="hidden" autoplay playsinline style="width:100%;margin-top:12px;border-radius:12px"></video>
+    <button id="stopCamera" class="scanbtn hidden" onclick="stopScan()">KAMERA BEENDEN</button>
+  </section>
+
+  <h2>Was möchtest du tun?</h2>
+  <div class="grid">
+    <button class="action" onclick="choose('Annahme')"><span>📥</span><strong>ANNAHME</strong></button>
+    <button class="action" onclick="choose('Abholung')"><span>📦</span><strong>ABHOLUNG</strong></button>
+    <button class="action" onclick="choose('Retoure')"><span>↩️</span><strong>RETOURE</strong></button>
+    <button class="action" onclick="choose('Versand')"><span>🚚</span><strong>VERSAND</strong></button>
+  </div>
+
+  <section id="workflow" class="card hidden">
+    <h2 id="workflowTitle">Sendung erfassen</h2>
+    <label class="small">Sendungsnummer</label>
+    <input id="number" placeholder="Nummer eingeben">
+    <label class="small">Paketdienst</label>
+    <select id="carrier">
+      <option>Automatische Erkennung / unbekannt</option>
+      <option>Österreichische Post</option>
+      <option>DHL Paket</option>
+      <option>DHL Express</option>
+      <option>Deutsche Post</option>
+      <option>DPD</option>
+      <option>GLS</option>
+      <option>UPS</option>
+      <option>Hermes</option>
+      <option>FedEx</option>
+      <option>Anderer Dienstleister</option>
+    </select>
+    <label class="small">Kundenname oder Abhol-PIN (optional)</label>
+    <input id="customer" placeholder="Name / PIN">
+    <button class="primary" onclick="saveOperation()">VORGANG SPEICHERN</button>
+    <button class="primary" style="background:#e8eee9;color:#123d2c" onclick="closeWorkflow()">ABBRECHEN</button>
+  </section>
+
+  <h2>Sendungen</h2>
+  <div class="card">
+    <input id="search" placeholder="Sendungsnummer suchen..." oninput="render()">
+    <div class="tabs">
+      <button class="active" onclick="filterItems('Alle',this)">Alle</button>
+      <button onclick="filterItems('Annahme',this)">Annahme</button>
+      <button onclick="filterItems('Abholung',this)">Abholung</button>
+      <button onclick="filterItems('Retoure',this)">Retoure</button>
+      <button onclick="filterItems('Versand',this)">Versand</button>
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <div class="notice">
+    <strong>Hinweis zum Testbetrieb:</strong><br>
+    Vorgänge werden auf diesem Gerät gespeichert. Das ist noch keine offizielle Buchung oder Bestätigung durch einen Paketdienst. Eine automatische Synchronisierung mit anderen Geräten ist noch nicht eingerichtet.
+  </div>
+</main>
+
+<footer>TRAKUNA · Lokale Testversion</footer>
+
+<script>
+let operations = [];
+let currentAction = "";
+let currentFilter = "Alle";
+let stream = null;
+let scanTimer = null;
+
+try {
+  operations = JSON.parse(localStorage.getItem("trakuna_operations") || "[]");
+  if (!Array.isArray(operations)) operations = [];
+} catch(e) {
+  operations = [];
+}
+
+function persist() {
+  localStorage.setItem("trakuna_operations", JSON.stringify(operations));
+}
+
+function choose(action) {
+  currentAction = action;
+  document.getElementById("workflowTitle").textContent = action + " erfassen";
+  document.getElementById("number").value =
+    document.getElementById("tracking").value.trim();
+  document.getElementById("workflow").classList.remove("hidden");
+  document.getElementById("workflow").scrollIntoView({behavior:"smooth"});
+}
+
+function continueWithNumber() {
+  if (!document.getElementById("tracking").value.trim()) {
+    alert("Bitte zuerst eine Sendungsnummer eingeben oder scannen.");
+    return;
+  }
+  choose("Annahme");
+}
+
+function closeWorkflow() {
+  document.getElementById("workflow").classList.add("hidden");
+}
+
+function saveOperation() {
+  const number = document.getElementById("number").value.trim();
+  const carrier = document.getElementById("carrier").value;
+  const customer = document.getElementById("customer").value.trim();
+
+  if (!number) {
+    alert("Bitte eine Sendungsnummer eingeben.");
+    return;
+  }
+
+  if (operations.some(x => x.number.toLowerCase() === number.toLowerCase()
+      && x.action === currentAction && x.status !== "Abgeschlossen")) {
+    alert("Dieser Vorgang ist bereits vorhanden.");
+    return;
+  }
+
+  operations.unshift({
+    id: Date.now().toString(),
+    number,
+    carrier,
+    customer,
+    action: currentAction,
+    status: currentAction === "Abholung" ? "Abgeschlossen" : "Lokal gespeichert",
+    date: new Date().toLocaleString("de-AT")
+  });
+
+  persist();
+  render();
+  closeWorkflow();
+
+  document.getElementById("tracking").value = "";
+  document.getElementById("number").value = "";
+  document.getElementById("customer").value = "";
+
+  alert("Vorgang wurde lokal auf diesem Gerät gespeichert.");
+}
+
+function filterItems(filter, button) {
+  currentFilter = filter;
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
+  button.classList.add("active");
+  render();
+}
+
+function render() {
+  const list = document.getElementById("list");
+  const query = document.getElementById("search").value.toLowerCase();
+
+  const filtered = operations.filter(x =>
+    (currentFilter === "Alle" || x.action === currentFilter) &&
+    (x.number.toLowerCase().includes(query) ||
+     x.carrier.toLowerCase().includes(query) ||
+     x.customer.toLowerCase().includes(query))
+  );
+
+  if (!filtered.length) {
+    list.innerHTML = '<p class="small">Keine Sendungen vorhanden.</p>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(x => `
+    <div class="item">
+      <strong>${escapeHTML(x.number)}</strong>
+      <div class="small">${escapeHTML(x.action)} · ${escapeHTML(x.carrier)}</div>
+      <div class="small">${escapeHTML(x.customer || "Kein Kundenname angegeben")}</div>
+      <div class="small">${escapeHTML(x.date)}</div>
+      <span class="status">${escapeHTML(x.status)}</span>
+      ${x.status !== "Abgeschlossen" ? `
+        <button class="primary" onclick="completeOperation('${x.id}')">
+          ALS ABGESCHLOSSEN MARKIEREN
+        </button>` : ""}
+    </div>
+  `).join("");
+}
+
+function completeOperation(id) {
+  const item = operations.find(x => x.id === id);
+  if (!item) return;
+  if (!confirm("Vorgang wirklich intern abschließen?")) return;
+  item.status = "Abgeschlossen";
+  persist();
+  render();
+}
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+async function startScan() {
+  const info = document.getElementById("cameraInfo");
+  const video = document.getElementById("video");
+
+  if (!("BarcodeDetector" in window)) {
+    info.textContent = "Kamera-Barcodeerkennung wird hier nicht unterstützt. Bitte Nummer manuell eingeben.";
+    return;
+  }
+
+  try {
+    const detector = new BarcodeDetector();
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:"environment"}
+    });
+    video.srcObject = stream;
+    video.classList.remove("hidden");
+    document.getElementById("stopCamera").classList.remove("hidden");
+    info.textContent = "Barcode vor die Kamera halten.";
+
+    scanTimer = setInterval(async () => {
+      if (video.readyState < 2) return;
+      try {
+        const codes = await detector.detect(video);
+        if (codes.length && codes[0].rawValue) {
+          document.getElementById("tracking").value = codes[0].rawValue;
+          stopScan();
+          info.textContent = "Barcode erkannt.";
+        }
+      } catch(e) {}
+    }, 500);
+  } catch(e) {
+    info.textContent = "Kamera nicht verfügbar oder Berechtigung verweigert. Bitte Nummer manuell eingeben.";
+  }
+}
+
+function stopScan() {
+  if (scanTimer) clearInterval(scanTimer);
+  scanTimer = null;
+  if (stream) stream.getTracks().forEach(track => track.stop());
+  stream = null;
+  document.getElementById("video").classList.add("hidden");
+  document.getElementById("stopCamera").classList.add("hidden");
+}
+
+render();
+</script>
+</body>
+</html>
